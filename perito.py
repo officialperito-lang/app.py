@@ -16,7 +16,7 @@ if not API_KEY:
     print("WARNING: GEMINI_API_KEY is not set.")
 
 # Make sure we are using a valid model
-MODEL = "gemini-1.5-flash"
+"gemini-3.1-flash-lite"
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:streamGenerateContent?alt=sse"
 
 # Render assigns a dynamic PORT
