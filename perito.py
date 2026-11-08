@@ -353,7 +353,7 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
                                 self.wfile.write(chunk_bytes)
                                 self.wfile.write(b"\r\n")
                                 self.wfile.flush()
-                            except Exception as e: 
+                            except Exception: 
                                 pass
                                 
                 # End of chunks
@@ -387,4 +387,18 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format, *args): 
         pass # Mute default logging to keep Render logs clean
 
-class ReusableServer(ThreadingHTTPSe
+class ReusableServer(ThreadingHTTPServer):
+    allow_reuse_address = True
+
+if __name__ == "__main__":
+    print("1. Starting script...")
+    try:
+        print(f"2. Attempting to bind to 0.0.0.0:{PORT}...")
+        # Render requires binding to 0.0.0.0
+        with ReusableServer(("0.0.0.0", PORT), PeritoHandler) as httpd:
+            print(f"3. ✅ PERITO IS RUNNING ON PORT {PORT}!")
+            httpd.serve_forever()
+    except Exception as e:
+        print("\n❌ CRITICAL ERROR DURING STARTUP:")
+        traceback.print_exc()
+        time.sleep(10) # Pause so Render captures the log before closing
