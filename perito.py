@@ -1,4 +1,3 @@
-from flask import Flask
 import http.server
 import json
 import os
@@ -10,13 +9,15 @@ import webbrowser
 from http.server import ThreadingHTTPServer
 
 # ====== CONFIG ======
-API_KEY ="AQ.Ab8RN6KijicmECmWCldHkJZ0EwNfF1Cs9KGmKh7Ojz0bUzMG9A"
-if not API_KEY:
-    raise SystemExit("GEMINI_API_KEY is not set.")
+# IMPORTANT: Set GEMINI_API_KEY in Render's Environment Variables!
+API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6KijicmECmWCldHkJZ0EwNfF1Cs9KGmKh7Ojz0bUzMG9A")
+if not API_KEY or API_KEY == "PASTE_YOUR_NEW_KEY_HERE":
+    print("WARNING: GEMINI_API_KEY is not set.")
 
 MODEL = "gemini-3.1-flash-lite"
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:streamGenerateContent?alt=sse"
-PORT = 8000
+# Render assigns a dynamic PORT, fallback to 8000 for local testing
+PORT = int(os.environ.get("PORT", 8000))
 HISTORY_FILE = "perito_memory.json"
 USAGE_FILE = "perito_usage.json"
 SETTINGS_FILE = "perito_settings.json"
@@ -343,11 +344,21 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
                             try:
                                 text = chunk_data['candidates'][0]['content']['parts'][0]['text']
                                 full_reply += text
-                                self.wfile.write(text.encode('utf-8'))
+                                
+                                # Proper HTTP Chunked Transfer Encoding
+                                chunk_bytes = text.encode('utf-8')
+                                self.wfile.write(f"{len(chunk_bytes):X}\r\n".encode('utf-8'))
+                                self.wfile.write(chunk_bytes)
+                                self.wfile.write(b"\r\n")
                                 self.wfile.flush()
                             except: pass
-            except Exception:
-                pass
+                
+                # Signal end of chunks
+                self.wfile.write(b"0\r\n\r\n")
+                self.wfile.flush()
+                
+            except Exception as e:
+                print(f"Stream error: {e}")
                 
             HISTORY.append({"role": "model", "parts": [{"text": full_reply}]})
             save_data()
@@ -376,13 +387,11 @@ class ReusableServer(ThreadingHTTPServer):
     allow_reuse_address = True
 
 def start_server():
-    with ReusableServer(("", PORT), PeritoHandler) as httpd:
-        print("\n✅ PERITO IS RUNNING! Chrome will open.")
+    # Bind to 0.0.0.0 so Render can reach it
+    with ReusableServer(("0.0.0.0", PORT), PeritoHandler) as httpd:
+        print(f"\n✅ PERITO IS RUNNING ON PORT {PORT}!")
         httpd.serve_forever()
 
 if __name__ == "__main__":
     print("Starting...")
-    threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{PORT}")).start()
-    start_server()
-    from flask import Flask
-app = Flask(__name__)
+    # Removed webbrow
