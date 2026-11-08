@@ -11,11 +11,11 @@ from http.server import ThreadingHTTPServer
 
 # ====== CONFIG ======
 # Read from Environment Variable (Render), fallback for local testing
-API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6KijicmECmWCldHkJZ0EwNfF1Cs9KGmKh7Ojz0bUzMG9A")
+API_KEY = os.environ.get("AQ.Ab8RN6I42AOAH9P3_Mkd8OA_3QbU5sqZOkmBABdQ77myl9UuxA")
 if not API_KEY or API_KEY == "PASTE_YOUR_NEW_KEY_HERE":
     print("WARNING: GEMINI_API_KEY is not set. The app will start, but AI features will fail.")
 
-MODEL = "gemini-3.1-flash-lite"
+MODEL = "gemini-1.5-flash"
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:streamGenerateContent?alt=sse"
 # Render assigns a dynamic PORT, fallback to 8000 for local testing
 PORT = int(os.environ.get("PORT", 8000))
