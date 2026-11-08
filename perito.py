@@ -6,13 +6,14 @@ import time
 import socket
 import base64
 import webbrowser
+import traceback
 from http.server import ThreadingHTTPServer
 
 # ====== CONFIG ======
-# IMPORTANT: Set GEMINI_API_KEY in Render's Environment Variables!
+# Read from Environment Variable (Render), fallback for local testing
 API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6KijicmECmWCldHkJZ0EwNfF1Cs9KGmKh7Ojz0bUzMG9A")
 if not API_KEY or API_KEY == "PASTE_YOUR_NEW_KEY_HERE":
-    print("WARNING: GEMINI_API_KEY is not set.")
+    print("WARNING: GEMINI_API_KEY is not set. The app will start, but AI features will fail.")
 
 MODEL = "gemini-3.1-flash-lite"
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:streamGenerateContent?alt=sse"
@@ -311,32 +312,33 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == '/ask':
-            length = int(self.headers.get('Content-Length', 0))
-            data = json.loads(self.rfile.read(length).decode('utf-8'))
-            prompt = (data.get('prompt') or '').strip()
-            img = data.get('image')
-            mime = data.get('mime')
-
-            if not prompt: return self._send(400, 'application/json', b'{"reply":"Empty"}')
-            if not check_usage(): return self._send(429, 'application/json', b'{"error":"LIMIT"}')
-
-            parts = [{"text": prompt}]
-            if img and mime: parts.append({"inline_data": {"mime_type": mime, "data": img}})
-            HISTORY.append({"role": "user", "parts": parts})
-            
-            payload = {
-                "system_instruction": {"parts": [{"text": SETTINGS["prompt"]}]},
-                "contents": HISTORY,
-                "generationConfig": {"temperature": SETTINGS["temperature"]}
-            }
-
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/plain')
-            self.send_header('Transfer-Encoding', 'chunked')
-            self.end_headers()
-
-            full_reply = ""
             try:
+                length = int(self.headers.get('Content-Length', 0))
+                data = json.loads(self.rfile.read(length).decode('utf-8'))
+                prompt = (data.get('prompt') or '').strip()
+                img = data.get('image')
+                mime = data.get('mime')
+
+                if not prompt: return self._send(400, 'application/json', b'{"reply":"Empty"}')
+                if not check_usage(): return self._send(429, 'application/json', b'{"error":"LIMIT"}')
+
+                parts = [{"text": prompt}]
+                if img and mime: parts.append({"inline_data": {"mime_type": mime, "data": img}})
+                HISTORY.append({"role": "user", "parts": parts})
+                
+                payload = {
+                    "system_instruction": {"parts": [{"text": SETTINGS["prompt"]}]},
+                    "contents": HISTORY,
+                    "generationConfig": {"temperature": SETTINGS["temperature"]}
+                }
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/plain; charset=utf-8')
+                self.send_header('Transfer-Encoding', 'chunked')
+                self.end_headers()
+
+                full_reply = ""
+                
                 with requests.post(URL, headers={"x-goog-api-key": API_KEY}, json=payload, stream=True, timeout=30) as r:
                     for line in r.iter_lines():
                         if line and line.startswith(b'data: '):
@@ -351,17 +353,18 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
                                 self.wfile.write(chunk_bytes)
                                 self.wfile.write(b"\r\n")
                                 self.wfile.flush()
-                            except: pass
-                
-                # Signal end of chunks
+                            except Exception as e: 
+                                pass
+                                
+                # End of chunks
                 self.wfile.write(b"0\r\n\r\n")
                 self.wfile.flush()
-                
+                    
+                HISTORY.append({"role": "model", "parts": [{"text": full_reply}]})
+                save_data()
             except Exception as e:
-                print(f"Stream error: {e}")
-                
-            HISTORY.append({"role": "model", "parts": [{"text": full_reply}]})
-            save_data()
+                print(f"Error in /ask: {e}")
+                traceback.print_exc()
             
         elif self.path == '/settings':
             length = int(self.headers.get('Content-Length', 0))
@@ -381,17 +384,7 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
             save_data()
             self._send(200, 'application/json', b'{"ok":true}')
 
-    def log_message(self, format, *args): pass
+    def log_message(self, format, *args): 
+        pass # Mute default logging to keep Render logs clean
 
-class ReusableServer(ThreadingHTTPServer):
-    allow_reuse_address = True
-
-def start_server():
-    # Bind to 0.0.0.0 so Render can reach it
-    with ReusableServer(("0.0.0.0", PORT), PeritoHandler) as httpd:
-        print(f"\n✅ PERITO IS RUNNING ON PORT {PORT}!")
-        httpd.serve_forever()
-
-if __name__ == "__main__":
-    print("Starting...")
-    # Removed webbrow
+class ReusableServer(ThreadingHTTPSe
