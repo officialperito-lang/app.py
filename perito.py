@@ -1,4 +1,4 @@
-import flask
+from flask import Flask
 import http.server
 import json
 import os
