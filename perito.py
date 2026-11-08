@@ -10,14 +10,16 @@ import traceback
 from http.server import ThreadingHTTPServer
 
 # ====== CONFIG ======
-# Read from Environment Variable (Render), fallback for local testing
-API_KEY = os.environ.get("AQ.Ab8RN6I42AOAH9P3_Mkd8OA_3QbU5sqZOkmBABdQ77myl9UuxA")
-if not API_KEY or API_KEY == "PASTE_YOUR_NEW_KEY_HERE":
-    print("WARNING: GEMINI_API_KEY is not set. The app will start, but AI features will fail.")
+# Render will inject GEMINI_API_KEY from your Environment Variables
+API_KEY = os.environ.get("AQ.Ab8RN6KijicmECmWCldHkJZ0EwNfF1Cs9KGmKh7Ojz0bUzMG9A")
+if not API_KEY:
+    print("WARNING: GEMINI_API_KEY is not set.")
 
+# Make sure we are using a valid model
 MODEL = "gemini-1.5-flash"
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:streamGenerateContent?alt=sse"
-# Render assigns a dynamic PORT, fallback to 8000 for local testing
+
+# Render assigns a dynamic PORT
 PORT = int(os.environ.get("PORT", 8000))
 HISTORY_FILE = "perito_memory.json"
 USAGE_FILE = "perito_usage.json"
@@ -27,7 +29,7 @@ SETTINGS_FILE = "perito_settings.json"
 try:
     import requests
 except ImportError:
-    raise SystemExit("requests is not installed.")
+    raise SystemExit("requests is not installed. Add it to requirements.txt.")
 
 HISTORY = []
 USAGE = {"messages_today": 0, "last_reset_date": str(time.strftime('%Y-%m-%d')), "is_premium": False}
@@ -340,23 +342,38 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
                 full_reply = ""
                 
                 with requests.post(URL, headers={"x-goog-api-key": API_KEY}, json=payload, stream=True, timeout=30) as r:
+                    if r.status_code != 200:
+                        print(f"API Error: {r.status_code} - {r.text}")
+                        self._send(500, 'text/plain', b'API Error')
+                        return
+                        
                     for line in r.iter_lines():
-                        if line and line.startswith(b'data: '):
-                            chunk_data = json.loads(line[6:])
-                            try:
-                                text = chunk_data['candidates'][0]['content']['parts'][0]['text']
-                                full_reply += text
-                                
-                                # Proper HTTP Chunked Transfer Encoding
-                                chunk_bytes = text.encode('utf-8')
-                                self.wfile.write(f"{len(chunk_bytes):X}\r\n".encode('utf-8'))
-                                self.wfile.write(chunk_bytes)
-                                self.wfile.write(b"\r\n")
-                                self.wfile.flush()
-                            except Exception: 
-                                pass
-                                
-                # End of chunks
+                        if line:
+                            decoded_line = line.decode('utf-8')
+                            if decoded_line.startswith('data: '):
+                                data_str = decoded_line[6:].strip()
+                                if data_str == '[DONE]':
+                                    break
+                                try:
+                                    chunk_data = json.loads(data_str)
+                                    candidates = chunk_data.get('candidates', [])
+                                    if candidates:
+                                        content = candidates[0].get('content', {})
+                                        parts_out = content.get('parts', [])
+                                        if parts_out and 'text' in parts_out[0]:
+                                            text = parts_out[0]['text']
+                                            full_reply += text
+                                            
+                                            # Proper HTTP Chunked Transfer Encoding
+                                            chunk_bytes = text.encode('utf-8')
+                                            self.wfile.write(f"{len(chunk_bytes):X}\r\n".encode('utf-8'))
+                                            self.wfile.write(chunk_bytes)
+                                            self.wfile.write(b"\r\n")
+                                            self.wfile.flush()
+                                except (KeyError, json.JSONDecodeError) as e:
+                                    print(f"Parse error: {e} | Data: {data_str}")
+                
+                                # End of chunks
                 self.wfile.write(b"0\r\n\r\n")
                 self.wfile.flush()
                     
@@ -396,9 +413,9 @@ if __name__ == "__main__":
         print(f"2. Attempting to bind to 0.0.0.0:{PORT}...")
         # Render requires binding to 0.0.0.0
         with ReusableServer(("0.0.0.0", PORT), PeritoHandler) as httpd:
-            print(f"3. ✅ PERITO IS RUNNING ON PORT {PORT}!")
+            print(f"3. PERITO IS RUNNING ON PORT {PORT}!")
             httpd.serve_forever()
     except Exception as e:
-        print("\n❌ CRITICAL ERROR DURING STARTUP:")
+        print("\nCRITICAL ERROR DURING STARTUP:")
         traceback.print_exc()
         time.sleep(10) # Pause so Render captures the log before closing
