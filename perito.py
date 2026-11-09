@@ -333,7 +333,7 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
 
                 full_reply = ""
                 
-                with requests.post(URL, headers={"x-goog-api-key": API_KEY}, json=payload, stream=True, timeout=30) as r:
+                with requests.post(URL + f"?key={API_KEY}", json=payload, stream=True, timeout=30) as r:
                     if r.status_code != 200:
                         error_msg = f"Google API Error {r.status_code}: {r.text}"
                         error_bytes = error_msg.encode('utf-8')
