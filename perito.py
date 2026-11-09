@@ -305,35 +305,36 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
         else: self._send(404, 'text/plain', b'Not Found')
 
     def do_POST(self):
-        if self.path == '/ask':
-            try:
-                length = int(self.headers.get('Content-Length', 0))
-                data = json.loads(self.rfile.read(length).decode('utf-8'))
-                prompt = (data.get('prompt') or '').strip()
-                img = data.get('image')
-                mime = data.get('mime')
+    if self.path == '/ask':
+        try:
+            length = int(self.headers.get('Content-Length', 0))
+            data = json.loads(self.rfile.read(length).decode('utf-8'))
+            prompt = (data.get('prompt') or '').strip()
+            img = data.get('image')
+            mime = data.get('mime')
 
-                if not prompt: return self._send(400, 'application/json', b'{"reply":"Empty"}')
-                if not check_usage(): return self._send(429, 'application/json', b'{"error":"LIMIT"}')
+            if not prompt: return self._send(400, 'application/json', b'{"reply":"Empty"}')
+            if not check_usage(): return self._send(429, 'application/json', b'{"error":"LIMIT"}')
 
-                parts = [{"text": prompt}]
-                if img and mime: parts.append({"inline_data": {"mime_type": mime, "data": img}})
-                HISTORY.append({"role": "user", "parts": parts})
-                
-                payload = {
-                    "system_instruction": {"parts": [{"text": SETTINGS["prompt"]}]},
-                    "contents": HISTORY,
-                    "generationConfig": {"temperature": SETTINGS["temperature"]}
-                }
+            parts = [{"text": prompt}]
+            if img and mime: parts.append({"inline_data": {"mime_type": mime, "data": img}})
+            HISTORY.append({"role": "user", "parts": parts})
+            
+            payload = {
+                "system_instruction": {"parts": [{"text": SETTINGS["prompt"]}]},
+                "contents": HISTORY,
+                "generationConfig": {"temperature": SETTINGS["temperature"]}
+            }
 
-                self.send_response(200)
-                self.send_header('Content-Type', 'text/plain; charset=utf-8')
-                self.send_header('Transfer-Encoding', 'chunked')
-                self.end_headers()
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.send_header('Transfer-Encoding', 'chunked')
+            self.end_headers()
 
-                full_reply = ""
-                
-                with requests.post(URL + f"?key={API_KEY}", json=payload, stream=True, timeout=30) as r:
+            full_reply = ""
+            
+            with requests.post(URL + f"?key={API_KEY}", json=payload, stream=True, timeout=30) as r:
+        
                     if r.status_code != 200:
                         error_msg = f"Google API Error {r.status_code}: {r.text}"
                         error_bytes = error_msg.encode('utf-8')
