@@ -10,7 +10,7 @@ import traceback
 from http.server import ThreadingHTTPServer
 
 # ====== CONFIG ======
-API_KEY ="AQ.Ab8RN6IgpekOgki00B4busduf_x2pLbL9B6ly9EtvNUrH9lM5A"
+API_KEY ="AQ.Ab8RN6J1gji9vFHKWn_W1KDtsulHr86O4axyCwZxCV1theZ97A"
 if not API_KEY:
     print("WARNING: GEMINI_API_KEY is not set.")
 
