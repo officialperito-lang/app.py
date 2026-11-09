@@ -375,7 +375,7 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
                     
                 HISTORY.append({"role": "model", "parts": [{"text": full_reply}]})
                 save_data()
-            except Exception as e:
+                        except Exception as e:
                 # THIS CATCHES PYTHON ERRORS
                 error_msg = f"Python Error: {str(e)}"
                 error_bytes = error_msg.encode('utf-8')
@@ -384,8 +384,8 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(b"\r\n")
                 self.wfile.write(b"0\r\n\r\n")
                 self.wfile.flush()
-        
-    elif self.path == '/settings':
+            
+        elif self.path == '/settings':
             length = int(self.headers.get('Content-Length', 0))
             data = json.loads(self.rfile.read(length).decode('utf-8'))
             SETTINGS["prompt"] = data.get("prompt", SETTINGS["prompt"])
@@ -419,5 +419,3 @@ if __name__ == "__main__":
         print("CRITICAL ERROR:", e)
         traceback.print_exc()
         time.sleep(10)
-            
-
