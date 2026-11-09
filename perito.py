@@ -14,7 +14,7 @@ API_KEY = os.environ.get("GEMINI_API_KEY")
 if not API_KEY:
     print("WARNING: GEMINI_API_KEY is not set.")
 
-MODEL = "gemini-2.0-flash"
+MODEL = "gemini-3.8-flash"
 # FIXED URL: Ends with & so we can append the key safely
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:streamGenerateContent?alt=sse&"
 
