@@ -384,7 +384,7 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(b"\r\n")
                 self.wfile.write(b"0\r\n\r\n")
                 self.wfile.flush()
-
+        
     elif self.path == '/settings':
             length = int(self.headers.get('Content-Length', 0))
             data = json.loads(self.rfile.read(length).decode('utf-8'))
@@ -420,4 +420,4 @@ if __name__ == "__main__":
         traceback.print_exc()
         time.sleep(10)
             
-  
+
