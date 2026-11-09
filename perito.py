@@ -373,9 +373,9 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(b"0\r\n\r\n")
                 self.wfile.flush()
                     
-                HISTORY.append({"role": "model", "parts": [{"text": full_reply}]})
+                                HISTORY.append({"role": "model", "parts": [{"text": full_reply}]})
                 save_data()
-                        except Exception as e:
+            except Exception as e:
                 # THIS CATCHES PYTHON ERRORS
                 error_msg = f"Python Error: {str(e)}"
                 error_bytes = error_msg.encode('utf-8')
