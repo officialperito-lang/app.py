@@ -10,16 +10,13 @@ import traceback
 from http.server import ThreadingHTTPServer
 
 # ====== CONFIG ======
-# Render will inject GEMINI_API_KEY from your Environment Variables
-API_KEY = os.environ.get("AQ.Ab8RN6KijicmECmWCldHkJZ0EwNfF1Cs9KGmKh7Ojz0bUzMG9A")
+API_KEY = os.environ.get("AQ.Ab8RN6JQeE5CtBxZ1HSV93YhWPMaxFQD0r9wZHI5hNw53UbjGg")
 if not API_KEY:
     print("WARNING: GEMINI_API_KEY is not set.")
 
-# Make sure we are using a valid model
-"gemini-3.1-flash-lite"
+MODEL = "gemini-1.5-flash"
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:streamGenerateContent?alt=sse"
 
-# Render assigns a dynamic PORT
 PORT = int(os.environ.get("PORT", 8000))
 HISTORY_FILE = "perito_memory.json"
 USAGE_FILE = "perito_usage.json"
@@ -29,7 +26,7 @@ SETTINGS_FILE = "perito_settings.json"
 try:
     import requests
 except ImportError:
-    raise SystemExit("requests is not installed. Add it to requirements.txt.")
+    raise SystemExit("requests is not installed.")
 
 HISTORY = []
 USAGE = {"messages_today": 0, "last_reset_date": str(time.strftime('%Y-%m-%d')), "is_premium": False}
@@ -131,33 +128,29 @@ HTML_PAGE = """
         <button id="send-btn" onclick="sendMessage()">Send</button>
     </div>
 
-    <!-- SETTINGS MODAL -->
     <div id="settings-modal" class="modal">
         <div class="modal-content">
             <h2>AI Settings</h2>
             <label>System Prompt (Personality)</label>
             <textarea id="sys-prompt"></textarea>
-            
-            <label>Temperature (Creativity): <span id="temp-val">0.7</span></label>
+            <label>Temperature: <span id="temp-val">0.7</span></label>
             <input type="range" id="temp-slider" min="0" max="1" step="0.1" oninput="document.getElementById('temp-val').textContent = this.value">
-            
             <button class="buy-btn" onclick="saveSettings()">Save Settings</button>
             <button class="close-btn" onclick="hideModal('settings-modal')">Close</button>
         </div>
     </div>
 
-    <!-- PAYWALL MODAL -->
     <div id="paywall-modal" class="modal">
         <div class="modal-content" style="text-align:center;">
             <h2 style="color:#f39c12;">Limit Reached</h2>
-            <p>You have used your 5 free messages for today. Upgrade to PERITO Premium for unlimited access!</p>
+            <p>You have used your 5 free messages for today.</p>
             <button class="buy-btn" style="background:#f39c12;" onclick="simulatePayment()">Upgrade for $4.99/mo</button>
             <button class="close-btn" onclick="hideModal('paywall-modal')">Close</button>
         </div>
     </div>
 
     <script>
-        let busy = false, idCounter = 0, imgB64 = "", imgMime = "";
+        let busy = false, imgB64 = "", imgMime = "";
         const chat = document.getElementById('chat-container'), userIn = document.getElementById('user-input');
         
         let rec = null;
@@ -178,7 +171,7 @@ HTML_PAGE = """
 
             try {
                 const data = await (await fetch('/history')).json();
-                if (data.history.length === 0) addAI('Hello! I am PERITO. Open the ⚙️ menu to change my personality!', true);
+                if (data.history.length === 0) addAI('Hello! I am PERITO.', true);
                 else data.history.forEach(m => m.role === 'user' ? addUser(m.parts[0].text) : addAI(m.parts[0].text, true));
             } catch { addAI('Hello! I am PERITO.', true); }
         };
@@ -191,7 +184,7 @@ HTML_PAGE = """
             const temp = document.getElementById('temp-slider').value;
             await fetch('/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({prompt: prompt, temperature: parseFloat(temp)}) });
             hideModal('settings-modal');
-            addAI("⚙️ Settings saved! My personality has been updated.", false);
+            addAI("⚙️ Settings saved!", false);
         }
 
         async function simulatePayment() {
@@ -231,8 +224,7 @@ HTML_PAGE = """
                 const res = await fetch('/ask', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: text, image: imgB64, mime: imgMime}) });
                 
                 if (!res.ok) {
-                    if (res.status === 429) { bubble.textContent = "Limit Reached"; showModal('paywall-modal'); }
-                    else bubble.textContent = "Error connecting to API.";
+                    bubble.textContent = "Error " + res.status;
                 } else {
                     const reader = res.body.getReader();
                     const decoder = new TextDecoder("utf-8");
@@ -343,8 +335,14 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
                 
                 with requests.post(URL, headers={"x-goog-api-key": API_KEY}, json=payload, stream=True, timeout=30) as r:
                     if r.status_code != 200:
-                        print(f"API Error: {r.status_code} - {r.text}")
-                        self._send(500, 'text/plain', b'API Error')
+                        # THIS SENDS THE REAL GOOGLE ERROR TO THE CHAT BUBBLE
+                        error_msg = f"Google API Error {r.status_code}: {r.text}"
+                        error_bytes = error_msg.encode('utf-8')
+                        self.wfile.write(f"{len(error_bytes):X}\r\n".encode('utf-8'))
+                        self.wfile.write(error_bytes)
+                        self.wfile.write(b"\r\n")
+                        self.wfile.write(b"0\r\n\r\n")
+                        self.wfile.flush()
                         return
                         
                     for line in r.iter_lines():
@@ -364,26 +362,30 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
                                             text = parts_out[0]['text']
                                             full_reply += text
                                             
-                                            # Proper HTTP Chunked Transfer Encoding
                                             chunk_bytes = text.encode('utf-8')
                                             self.wfile.write(f"{len(chunk_bytes):X}\r\n".encode('utf-8'))
                                             self.wfile.write(chunk_bytes)
                                             self.wfile.write(b"\r\n")
                                             self.wfile.flush()
-                                except (KeyError, json.JSONDecodeError) as e:
-                                    print(f"Parse error: {e} | Data: {data_str}")
+                                except Exception:
+                                    pass
                 
-                                # End of chunks
                 self.wfile.write(b"0\r\n\r\n")
                 self.wfile.flush()
                     
                 HISTORY.append({"role": "model", "parts": [{"text": full_reply}]})
                 save_data()
             except Exception as e:
-                print(f"Error in /ask: {e}")
-                traceback.print_exc()
-            
-        elif self.path == '/settings':
+                # THIS CATCHES PYTHON ERRORS
+                error_msg = f"Python Error: {str(e)}"
+                error_bytes = error_msg.encode('utf-8')
+                self.wfile.write(f"{len(error_bytes):X}\r\n".encode('utf-8'))
+                self.wfile.write(error_bytes)
+                self.wfile.write(b"\r\n")
+                self.wfile.write(b"0\r\n\r\n")
+                self.wfile.flush()
+
+    elif self.path == '/settings':
             length = int(self.headers.get('Content-Length', 0))
             data = json.loads(self.rfile.read(length).decode('utf-8'))
             SETTINGS["prompt"] = data.get("prompt", SETTINGS["prompt"])
@@ -402,20 +404,20 @@ class PeritoHandler(http.server.BaseHTTPRequestHandler):
             self._send(200, 'application/json', b'{"ok":true}')
 
     def log_message(self, format, *args): 
-        pass # Mute default logging to keep Render logs clean
+        pass
 
 class ReusableServer(ThreadingHTTPServer):
     allow_reuse_address = True
 
 if __name__ == "__main__":
-    print("1. Starting script...")
+    print("Starting...")
     try:
-        print(f"2. Attempting to bind to 0.0.0.0:{PORT}...")
-        # Render requires binding to 0.0.0.0
         with ReusableServer(("0.0.0.0", PORT), PeritoHandler) as httpd:
-            print(f"3. PERITO IS RUNNING ON PORT {PORT}!")
+            print(f"PERITO IS RUNNING ON PORT {PORT}")
             httpd.serve_forever()
     except Exception as e:
-        print("\nCRITICAL ERROR DURING STARTUP:")
+        print("CRITICAL ERROR:", e)
         traceback.print_exc()
-        time.sleep(10) # Pause so Render captures the log before closing
+        time.sleep(10)
+            
+  
