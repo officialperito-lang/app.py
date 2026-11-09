@@ -14,7 +14,7 @@ API_KEY ="AQ.Ab8RN6LRvJu4iBaXzZxo7-Y9kaDLJkQvc_q52f8JAOA3YdxplQ"
 if not API_KEY:
     print("WARNING: GEMINI_API_KEY is not set.")
 
-MODEL = "gemini-1.5-flash"
+MODEL = "gemini-2.0-flash"
 # We append the API key directly to the URL to avoid header issues
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:streamGenerateContent?alt=sse"
 
