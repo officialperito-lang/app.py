@@ -11,7 +11,7 @@ if not API_KEY:
     print("WARNING: GEMINI_API_KEY is not set.")
 
 # Switched to a fast and stable model
-MODEL = "gemini-3.8-flash"
+MODEL = "gemini-1.5-flash"
 # NON-STREAMING URL (Much faster and more reliable)
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={API_KEY}"
 
