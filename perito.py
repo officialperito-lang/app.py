@@ -15,7 +15,7 @@ if not API_KEY:
     print("WARNING: GEMINI_API_KEY is not set.")
 
 # Switched to the faster, more stable model
-MODEL = "gemini-3.1-flash"
+MODEL = "gemini-3.8-flash"
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:streamGenerateContent?alt=sse&"
 
 PORT = int(os.environ.get("PORT", 8000))
